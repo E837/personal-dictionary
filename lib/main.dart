@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:html/parser.dart' show parse;
 
 import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
@@ -62,7 +63,12 @@ class _MyHomePageState extends State<MyHomePage> {
           print((row[3] as Data).value); // 4th column contains the translation
         }
       } else {
-        // debugPrint(file.readAsStringSync());
+        final document = parse(file.readAsStringSync());
+        final elements = document.querySelectorAll('a[href *="+meaning"]');
+        // in every phrase I've searched on Google, I've added "meaning" at the end of the search
+        for (var e in elements) {
+          print(e.text);
+        }
       }
     } else {
       // User canceled the picker
