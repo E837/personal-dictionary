@@ -1,13 +1,16 @@
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:pdict/models/word.dart';
 
 class WordCard extends StatefulWidget {
+  final int index;
   final Word word;
   final bool isFocused;
   const WordCard({
     Key? key,
+    required this.index,
     required this.word,
     required this.isFocused,
   }) : super(key: key);
@@ -24,20 +27,22 @@ class _WordCardState extends State<WordCard> {
       return [];
     }
     return [
+      // const SizedBox(height: 20),
+      // Text('Description: ${widget.word.url}'),
       const SizedBox(height: 20),
-      Text('Description: ${widget.word.description}'),
-      const SizedBox(height: 20),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Text(widget.word.translation),
-          const Text(' :'),
-          const Text(
-            'ترجمه فارسی',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ],
+      const Text(
+        'ترجمه فارسی',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 30,
+        ),
       ),
+      AutoSizeText(
+          widget.word.translation ?? 'no translation available for this one',
+          style: const TextStyle(fontSize: 30),
+          maxLines: 3,
+          textAlign: TextAlign.center,
+          minFontSize: 14),
     ];
   }
 
@@ -54,50 +59,70 @@ class _WordCardState extends State<WordCard> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Align(
-          alignment: Alignment.center,
-          child: SizedBox(
-            width: deviceSize.width * 0.7,
-            height: deviceSize.height * 0.6,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        child: SizedBox(
+          width: deviceSize.width * 0.7,
+          height: deviceSize.height * 0.6,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Text(
+                    widget.word.type == WType.word
+                        ? 'Word ${widget.index + 1}'
+                        : 'Phrase ${widget.index + 1}',
+                    style: Theme.of(context).textTheme.headline5,
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Icons.star_outline),
+                  )
+                ],
+              ),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
+                    AutoSizeText(
                       widget.word.title,
-                      style: Theme.of(context).textTheme.headline4,
+                      style: const TextStyle(fontSize: 35),
+                      minFontSize: 14,
+                      maxFontSize: 35,
+                      maxLines: 3,
+                      wrapWords: false,
                     ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.star_outline),
-                    )
+                    ...showTranslation(_showTranslation),
                   ],
                 ),
-                ...showTranslation(_showTranslation),
-                const Spacer(),
-                ElevatedButton(
-                  onPressed: () async {
-                    final uri = Uri.parse(
-                        'https://translate.google.com/?source=osdd&sl=auto&tl=auto&text=test&op=translate');
-                    launchUrl(uri);
-                  },
-                  child: const Text('test'),
-                ),
-                if (!_showTranslation)
-                  Center(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          _showTranslation = true;
-                        });
-                      },
-                      child: const Text('See Translation'),
+              ),
+              // const Spacer(),
+              if (!_showTranslation && widget.word.type == WType.word)
+                Center(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _showTranslation = true;
+                      });
+                    },
+                    icon: const Icon(Icons.translate),
+                    label: const Text('See Translation'),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 40),
                     ),
                   ),
-              ],
-            ),
+                ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final uri = Uri.parse(widget.word.url);
+                  launchUrl(uri);
+                },
+                icon: const Icon(Icons.search),
+                label: const Text('Search Online'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 40),
+                ),
+              ),
+            ],
           ),
         ),
       ),

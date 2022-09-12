@@ -1,95 +1,93 @@
-import 'models/t_object.dart';
 import 'models/word.dart';
-import 'models/g_link.dart';
 
-List<TObject> tObjects = [
+List<Word> words = [
   Word(
     title: 'word1',
-    description: 'it means nothing',
+    // url: Word.makeUrl('word1'),
     translation: 'هیچ',
   ),
   Word(
     title: 'word2',
-    description: 'it means nothing',
+    // url: Word.makeUrl('word2'),
     translation: 'هیچ',
   ),
   Word(
     title: 'word3',
-    description: 'it means nothing',
+    // url: Word.makeUrl('word3'),
     translation: 'هیچ',
   ),
   Word(
     title: 'word4',
-    description: 'it means nothing',
+    // url: Word.makeUrl('wor4'),
     translation: 'هیچ',
   ),
   Word(
     title: 'word5',
-    description: 'it means nothing',
+    // url: Word.makeUrl('word5'),
     translation: 'هیچ',
   ),
   Word(
     title: 'word6',
-    description: 'it means nothing',
+    // url: Word.makeUrl('word6'),
     translation: 'هیچ',
   ),
   Word(
     title: 'word7',
-    description: 'it means nothing',
+    // url: Word.makeUrl('word7'),
     translation: 'هیچ',
   ),
   Word(
     title: 'word8',
-    description: 'it means nothing',
+    // url: Word.makeUrl('word8'),
     translation: 'هیچ',
   ),
   Word(
     title: 'word9',
-    description: 'it means nothing',
+    // url: Word.makeUrl('word9'),
     translation: 'هیچ',
   ),
   Word(
     title: 'word10',
-    description: 'it means nothing',
+    // url: Word.makeUrl('word10'),
     translation: 'هیچ',
   ),
-  GLink(
+  Word(
     title: 'link1',
     url: 'https://www.google.com/search?q=if+i+say+so+myself+meaning',
   ),
-  GLink(
+  Word(
     title: 'link2',
     url: 'https://www.google.com/search?q=if+i+say+so+myself+meaning',
   ),
-  GLink(
+  Word(
     title: 'link3',
     url: 'https://www.google.com/search?q=if+i+say+so+myself+meaning',
   ),
-  GLink(
+  Word(
     title: 'link4',
     url: 'https://www.google.com/search?q=if+i+say+so+myself+meaning',
   ),
-  GLink(
+  Word(
     title: 'link5',
     url: 'https://www.google.com/search?q=if+i+say+so+myself+meaning',
   ),
-  GLink(
+  Word(
     title: 'link6',
     url: 'https://www.google.com/search?q=if+i+say+so+myself+meaning',
   ),
-  GLink(
+  Word(
     title: 'link7',
     url: 'https://www.google.com/search?q=if+i+say+so+myself+meaning',
   ),
-  GLink(
+  Word(
     title: 'link8',
     url: 'https://www.google.com/search?q=if+i+say+so+myself+meaning',
   ),
-  GLink(
+  Word(
     title: 'link9',
     url: 'https://www.google.com/search?q=if+i+say+so+myself+meaning',
   ),
-  GLink(
+  Word(
     title: 'link10',
     url: 'https://www.google.com/search?q=if+i+say+so+myself+meaning',
   ),

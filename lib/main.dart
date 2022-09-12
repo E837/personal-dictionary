@@ -6,7 +6,6 @@ import 'package:scroll_snap_list/scroll_snap_list.dart';
 import 'package:file_picker/file_picker.dart';
 
 import 'package:pdict/word_card.dart';
-import 'models/word.dart';
 import 'temp_data.dart';
 
 void main() {
@@ -38,6 +37,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  static const itemsCount = 20;
   int _focusedIndex = 0;
 
   Future<void> getFile({required bool isTable}) async {
@@ -48,8 +48,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
     if (result != null) {
       File file = File(result.files.single.path!);
-      print('--------------');
-      print(await file.readAsString());
+      debugPrint('--------------');
+      debugPrint(await file.readAsString());
     } else {
       // User canceled the picker
     }
@@ -70,29 +70,44 @@ class _MyHomePageState extends State<MyHomePage> {
             onPressed: () {
               getFile(isTable: false);
             },
-            icon: const Icon(Icons.bookmark_add),
+            icon: const Icon(Icons.code),
+            tooltip: 'Import .html',
           ),
           IconButton(
             onPressed: () {
               getFile(isTable: true);
             },
-            icon: const Icon(Icons.translate),
+            icon: const Icon(Icons.playlist_add),
+            tooltip: 'Import .csv',
           ),
         ],
+        leading: IconButton(
+          onPressed: () {},
+          icon: const Icon(Icons.ios_share),
+          tooltip: 'Export json',
+        ),
       ),
       body: Column(
         children: [
-          const Expanded(
+          Expanded(
             flex: 1,
-            child: SizedBox(),
+            child: Center(
+              child: Text(
+                'Day #?',
+                style: Theme.of(context).textTheme.headline4,
+              ),
+            ),
           ),
           Expanded(
             flex: 6,
             child: ScrollSnapList(
-              itemCount: 10,
+              // todo: we need a way to keep items alive (or keep their state)
+              // todo: card positioning has bugs (cards don't stop at center + last card buttons don't work cuz of it i think)
+              itemCount: itemsCount,
               itemBuilder: (context, index) {
                 return WordCard(
-                  word: tObjects[index] as Word,
+                  index: index,
+                  word: words[index],
                   isFocused: _focusedIndex == index,
                 );
               },
@@ -112,8 +127,8 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: const [
-                  Text('Sample text'),
-                  Text('Today\'s words: 5'),
+                  Text('Remaining Words: ?\nRemaining Phrases: ?'),
+                  Text('Today\'s words: $itemsCount'),
                 ],
               ),
             ),
