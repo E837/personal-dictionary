@@ -1,9 +1,10 @@
-class Translate {
+class TObject {
+  // "translation object" it means (it's the base class for GLink and Word)
   final String title;
   int _views = 0;
   bool _isFavorite = false;
 
-  Translate({
+  TObject({
     required this.title,
   });
 

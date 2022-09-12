@@ -2,7 +2,7 @@ import 'models/t_object.dart';
 import 'models/word.dart';
 import 'models/g_link.dart';
 
-List<Translate> tObjects = [
+List<TObject> tObjects = [
   Word(
     title: 'word1',
     description: 'it means nothing',

@@ -1,6 +1,6 @@
 import 'package:pdict/models/t_object.dart';
 
-class GLink extends Translate {
+class GLink extends TObject {
   String url;
 
   GLink({

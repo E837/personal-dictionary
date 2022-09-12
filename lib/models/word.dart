@@ -1,6 +1,6 @@
 import 'package:pdict/models/t_object.dart';
 
-class Word extends Translate {
+class Word extends TObject {
   final String description;
   final String translation;
 
