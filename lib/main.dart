@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:scroll_snap_list/scroll_snap_list.dart';
@@ -43,13 +44,26 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> getFile({required bool isTable}) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: [isTable ? 'csv' : 'html'],
+      allowedExtensions: [isTable ? 'xlsx' : 'html'],
     );
 
     if (result != null) {
       File file = File(result.files.single.path!);
-      debugPrint('--------------');
-      debugPrint(await file.readAsString());
+      if (isTable) {
+        var bytes = file.readAsBytesSync();
+        var excel = Excel.decodeBytes(bytes);
+        debugPrint('--------------');
+        var sheet = excel.tables['Saved translations'];
+        // "Saved translations" is the sheet name
+        print(sheet?.maxCols);
+        print(sheet?.maxRows);
+        for (var row in sheet?.rows ?? []) {
+          print((row[2] as Data).value); // 3rd column contains the source word
+          print((row[3] as Data).value); // 4th column contains the translation
+        }
+      } else {
+        // debugPrint(file.readAsStringSync());
+      }
     } else {
       // User canceled the picker
     }
