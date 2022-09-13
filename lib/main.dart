@@ -1,14 +1,19 @@
 import 'dart:io';
+import 'dart:math';
+
 import 'package:html/parser.dart' show parse;
+import 'package:provider/provider.dart';
 
 import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:pdict/models/word.dart';
+import 'package:pdict/models/words.dart';
 import 'package:scroll_snap_list/scroll_snap_list.dart';
 import 'package:file_picker/file_picker.dart';
 
 import 'package:pdict/word_card.dart';
-import 'temp_data.dart';
+// import 'temp_data.dart';
 
 void main() {
   runApp(const MyApp());
@@ -19,14 +24,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'PersonalDict',
-      theme: ThemeData(
-        primarySwatch: Colors.purple,
-        fontFamily: GoogleFonts.ubuntu().fontFamily,
+    return ChangeNotifierProvider(
+      create: (ctx) => Words(),
+      child: MaterialApp(
+        title: 'PersonalDict',
+        theme: ThemeData(
+          primarySwatch: Colors.purple,
+          fontFamily: GoogleFonts.ubuntu().fontFamily,
+        ),
+        home: const MyHomePage(),
+        debugShowCheckedModeBanner: false,
       ),
-      home: const MyHomePage(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -39,10 +47,10 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  static const itemsCount = 20;
   int _focusedIndex = 0;
 
-  Future<void> getFile({required bool isTable}) async {
+  Future<void> getFile(
+      {required Words wordsData, required bool isTable}) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: [isTable ? 'xlsx' : 'html'],
@@ -51,6 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (result != null) {
       File file = File(result.files.single.path!);
       if (isTable) {
+        // xlsx file
         var bytes = file.readAsBytesSync();
         var excel = Excel.decodeBytes(bytes);
         debugPrint('--------------');
@@ -58,17 +67,29 @@ class _MyHomePageState extends State<MyHomePage> {
         // "Saved translations" is the sheet name
         print(sheet?.maxCols);
         print(sheet?.maxRows);
+        final List<String> sources = [];
+        final List<String> translations = [];
         for (var row in sheet?.rows ?? []) {
           print((row[2] as Data).value); // 3rd column contains the source word
+          sources.add((row[2] as Data).value);
           print((row[3] as Data).value); // 4th column contains the translation
+          translations.add((row[3] as Data).value);
         }
+        wordsData.fetchWords(sources, translations);
       } else {
+        // html file
         final document = parse(file.readAsStringSync());
         final elements = document.querySelectorAll('a[href *="+meaning"]');
         // in every phrase I've searched on Google, I've added "meaning" at the end of the search
+        final List<String> sources = [];
+        final List<String> urls = [];
         for (var e in elements) {
           print(e.text);
+          sources.add(Word.getPhraseTitle(e.text));
+          print(e.attributes['href']);
+          urls.add(e.attributes['href'] ?? '');
         }
+        wordsData.fetchPhrases(sources, urls);
       }
     } else {
       // User canceled the picker
@@ -78,6 +99,8 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     final deviceSize = MediaQuery.of(context).size;
+    final wordsData = Provider.of<Words>(context);
+    final words = wordsData.words;
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -88,23 +111,23 @@ class _MyHomePageState extends State<MyHomePage> {
         actions: [
           IconButton(
             onPressed: () {
-              getFile(isTable: false);
+              getFile(wordsData: wordsData, isTable: false);
             },
             icon: const Icon(Icons.code),
             tooltip: 'Import .html',
           ),
           IconButton(
             onPressed: () {
-              getFile(isTable: true);
+              getFile(wordsData: wordsData, isTable: true);
             },
             icon: const Icon(Icons.playlist_add),
-            tooltip: 'Import .csv',
+            tooltip: 'Import .xlsx',
           ),
         ],
         leading: IconButton(
           onPressed: () {},
           icon: const Icon(Icons.ios_share),
-          tooltip: 'Export json',
+          tooltip: 'Export .json',
         ),
       ),
       body: Column(
@@ -120,25 +143,44 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           Expanded(
             flex: 6,
-            child: ScrollSnapList(
-              // todo: we need a way to keep items alive (or keep their state)
-              // todo: card positioning has bugs (cards don't stop at center + last card buttons don't work cuz of it i think)
-              itemCount: itemsCount,
-              itemBuilder: (context, index) {
-                return WordCard(
-                  index: index,
-                  word: words[index],
-                  isFocused: _focusedIndex == index,
-                );
-              },
-              onItemFocus: (index) {
-                setState(() {
-                  _focusedIndex = index;
-                });
-              },
-              itemSize: deviceSize.width * 0.89,
-              // scrollPhysics: const BouncingScrollPhysics(),
-            ),
+            child: words.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'It\'s cozy here',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 30),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'no words, no phrases,\nand nothing else...',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 20),
+                        ),
+                      ],
+                    ),
+                  )
+                : ScrollSnapList(
+                    // todo: we need a way to keep items alive (or keep their state)
+                    // todo: card positioning has bugs (cards don't stop at center + last card buttons don't work cuz of it i think)
+                    itemCount: min(words.length, 20),
+                    itemBuilder: (context, index) {
+                      return WordCard(
+                        index: index,
+                        word: words[index],
+                        isFocused: _focusedIndex == index,
+                      );
+                    },
+                    onItemFocus: (index) {
+                      setState(() {
+                        _focusedIndex = index;
+                      });
+                    },
+                    itemSize: deviceSize.width * 0.89,
+                    // scrollPhysics: const BouncingScrollPhysics(),
+                  ),
           ),
           Expanded(
             flex: 2,
@@ -146,9 +188,10 @@ class _MyHomePageState extends State<MyHomePage> {
               padding: const EdgeInsets.symmetric(horizontal: 40.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Remaining Words: ?\nRemaining Phrases: ?'),
-                  Text('Today\'s words: $itemsCount'),
+                children: [
+                  Text(
+                      'Remaining Words: ${words.length}\nRemaining Phrases: ?'),
+                  Text('Today\'s words: ${min(words.length, 20)}'),
                 ],
               ),
             ),

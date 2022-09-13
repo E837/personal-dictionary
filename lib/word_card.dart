@@ -38,11 +38,12 @@ class _WordCardState extends State<WordCard> {
         ),
       ),
       AutoSizeText(
-          widget.word.translation ?? 'no translation available for this one',
-          style: const TextStyle(fontSize: 30),
-          maxLines: 3,
-          textAlign: TextAlign.center,
-          minFontSize: 14),
+        widget.word.translation ?? 'no translation available for this one',
+        style: const TextStyle(fontSize: 30),
+        maxLines: 3,
+        textAlign: TextAlign.center,
+        minFontSize: 14,
+      ),
     ];
   }
 
@@ -90,6 +91,7 @@ class _WordCardState extends State<WordCard> {
                       maxFontSize: 35,
                       maxLines: 3,
                       wrapWords: false,
+                      textAlign: TextAlign.center,
                     ),
                     ...showTranslation(_showTranslation),
                   ],
@@ -97,19 +99,43 @@ class _WordCardState extends State<WordCard> {
               ),
               // const Spacer(),
               if (!_showTranslation && widget.word.type == WType.word)
-                Center(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _showTranslation = true;
-                      });
-                    },
-                    icon: const Icon(Icons.translate),
-                    label: const Text('See Translation'),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 40),
-                    ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _showTranslation = true;
+                    });
+                  },
+                  icon: const Icon(Icons.translate),
+                  label: const Text('See Translation'),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 40),
                   ),
+                ),
+              if (_showTranslation || widget.word.type == WType.phrase)
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.warning_amber),
+                        label: const Text('Wrong'),
+                        style: ElevatedButton.styleFrom(
+                          primary: Colors.red[600],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.task_alt),
+                        label: const Text('Correct'),
+                        style: ElevatedButton.styleFrom(
+                          primary: Colors.green[600],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ElevatedButton.icon(
                 onPressed: () async {
