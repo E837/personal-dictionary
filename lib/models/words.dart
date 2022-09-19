@@ -8,7 +8,7 @@ class Words with ChangeNotifier {
   List<Word> doneWords = [];
 
   void fetchWords(List<String> sources, List<String> translations) {
-    final titles = getTitles();
+    final titles = _getTitles();
     for (int i = 0; i < sources.length; i++) {
       if (!titles.contains(sources[i].toLowerCase().trim())) {
         freshWords.add(Word(
@@ -24,7 +24,7 @@ class Words with ChangeNotifier {
   }
 
   void fetchPhrases(List<String> sources, List<String> urls) {
-    final titles = getTitles();
+    final titles = _getTitles();
     for (int i = 0; i < sources.length; i++) {
       if (!titles.contains(sources[i].toLowerCase().trim())) {
         freshWords.add(Word(
@@ -39,11 +39,12 @@ class Words with ChangeNotifier {
     notifyListeners();
   }
 
-  List<String> getTitles() {
-    return freshWords.map((e) => e.title.toLowerCase().trim()).toList();
+  List<String> _getTitles() {
+    final totalWords = freshWords + wordsInBox;
+    return totalWords.map((e) => e.title.toLowerCase().trim()).toList();
   }
 
-  void addEightNewWordsToBox() {
+  String? addEightNewWordsToBox() {
     int count = 0; // count of chosen words
     // handling words of the previous day
     for (var word in wordsInBox) {
@@ -65,15 +66,18 @@ class Words with ChangeNotifier {
         wordsInBox.add(freshWords[i]);
         freshWords.removeAt(i);
         count++;
+        // now we should reset the index (i)
+        i = -1;
+        // we set i to -1 because it will become 0 by the line below (i++) and so we are resetting the i to 0
       }
       i++;
     }
 
     // in case we don't have enough fresh words
     if (count < 8) {
-      debugPrint(
-          'We don\'nt have enough fresh words to add (added $count word(s))');
+      return ('We don\'nt have enough fresh words to add\n(added $count word(s))');
     }
+    return null;
   }
 
   void stageUp(Word word) {

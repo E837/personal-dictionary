@@ -74,7 +74,6 @@ class _MyHomePageState extends State<MyHomePage> {
           bytes = file.readAsBytesSync();
         }
         var excel = Excel.decodeBytes(bytes);
-        debugPrint('--------------');
         var sheet = excel.tables['Saved translations'];
         // "Saved translations" is the sheet name
         final List<String> sources = [];
@@ -229,10 +228,17 @@ class _MyHomePageState extends State<MyHomePage> {
           Expanded(
             flex: 1,
             child: ElevatedButton(
-              onPressed: allAnswered() && todayWords.isNotEmpty
+              onPressed: allAnswered()
                   ? () {
                       setState(() {
-                        wordsData.addEightNewWordsToBox();
+                        final response = wordsData.addEightNewWordsToBox();
+                        if (response != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text(
+                            response,
+                            textAlign: TextAlign.center,
+                          )));
+                        }
                         wordsData.getTodayWords();
                         _dayNo++;
                       });
