@@ -1,6 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
 // import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+import 'package:html/dom.dart' show Document;
 import 'package:html/parser.dart' show parse;
 import 'package:provider/provider.dart';
 
@@ -57,11 +60,19 @@ class _MyHomePageState extends State<MyHomePage> {
       allowedExtensions: [isTable ? 'xlsx' : 'html'],
     );
 
-    if (result != null) {
-      File file = File(result.files.single.path!);
+    if (result != null && result.files.isNotEmpty) {
+      late File file;
+      if (!kIsWeb) {
+        file = File(result.files.single.path!);
+      }
       if (isTable) {
         // xlsx file
-        var bytes = file.readAsBytesSync();
+        late Uint8List bytes;
+        if (kIsWeb) {
+          bytes = result.files.single.bytes!;
+        } else {
+          bytes = file.readAsBytesSync();
+        }
         var excel = Excel.decodeBytes(bytes);
         debugPrint('--------------');
         var sheet = excel.tables['Saved translations'];
@@ -75,7 +86,12 @@ class _MyHomePageState extends State<MyHomePage> {
         wordsData.fetchWords(sources, translations);
       } else {
         // html file
-        final document = parse(file.readAsStringSync());
+        late final Document document;
+        if (kIsWeb) {
+          document = parse(String.fromCharCodes(result.files.single.bytes!));
+        } else {
+          document = parse(file.readAsStringSync());
+        }
         final elements = document.querySelectorAll('a[href *="+meaning"]');
         // in every phrase I've searched on Google, I've added "meaning" at the end of the search
         final List<String> sources = [];
