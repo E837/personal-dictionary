@@ -4,11 +4,13 @@ import 'word.dart';
 
 class Words with ChangeNotifier {
   List<Word> freshWords = [];
+  List<Word> freshPhrases = [];
+  // we only separate words and phrases when they are fresh, in other situations they don't have any differences
   List<Word> wordsInBox = [];
   List<Word> doneWords = [];
 
   void fetchWords(List<String> sources, List<String> translations) {
-    final titles = _getTitles();
+    final titles = _getTitles(isPhrase: false);
     for (int i = 0; i < sources.length; i++) {
       if (!titles.contains(sources[i].toLowerCase().trim())) {
         freshWords.add(Word(
@@ -24,10 +26,10 @@ class Words with ChangeNotifier {
   }
 
   void fetchPhrases(List<String> sources, List<String> urls) {
-    final titles = _getTitles();
+    final titles = _getTitles(isPhrase: true);
     for (int i = 0; i < sources.length; i++) {
       if (!titles.contains(sources[i].toLowerCase().trim())) {
-        freshWords.add(Word(
+        freshPhrases.add(Word(
           title: sources[i],
           url: urls[i],
         ));
@@ -39,8 +41,14 @@ class Words with ChangeNotifier {
     notifyListeners();
   }
 
-  List<String> _getTitles() {
-    final totalWords = freshWords + wordsInBox;
+  List<String> _getTitles({required bool isPhrase}) {
+    late final List<Word> totalWords;
+    if (isPhrase) {
+      totalWords = freshPhrases + wordsInBox;
+      // "wordsInBox" contains both phrases and words but it doesn't matter
+    } else {
+      totalWords = freshWords + wordsInBox;
+    }
     return totalWords.map((e) => e.title.toLowerCase().trim()).toList();
   }
 
@@ -57,14 +65,15 @@ class Words with ChangeNotifier {
         count++;
       }
     }
-    // adding fresh words to box
+    // we are going to add 1 phrase and 7 words to the box
+    // adding fresh phrases to box
     int i = 0; // index of current word
-    while (count < 8 && i < freshWords.length) {
-      if (freshWords[i].level == 0 && freshWords[i].stage == 0) {
-        freshWords[i].level = 1;
-        freshWords[i].stage = 1;
-        wordsInBox.add(freshWords[i]);
-        freshWords.removeAt(i);
+    while (count < 1 && i < freshPhrases.length) {
+      if (freshPhrases[i].level == 0 && freshPhrases[i].stage == 0) {
+        freshPhrases[i].level = 1;
+        freshPhrases[i].stage = 1;
+        wordsInBox.add(freshPhrases[i]);
+        freshPhrases.removeAt(i);
         count++;
         // now we should reset the index (i)
         i = -1;
@@ -72,10 +81,25 @@ class Words with ChangeNotifier {
       }
       i++;
     }
+    // adding fresh words to box
+    int j = 0; // index of current word
+    while (count < 8 && j < freshWords.length) {
+      if (freshWords[j].level == 0 && freshWords[j].stage == 0) {
+        freshWords[j].level = 1;
+        freshWords[j].stage = 1;
+        wordsInBox.add(freshWords[j]);
+        freshWords.removeAt(j);
+        count++;
+        // now we should reset the index (j)
+        j = -1;
+        // we set i to -1 because it will become 0 by the line below (j++) and so we are resetting the i to 0
+      }
+      j++;
+    }
 
     // in case we don't have enough fresh words
     if (count < 8) {
-      return ('We don\'nt have enough fresh words to add\n(added $count word(s))');
+      return ('We don\'nt have enough fresh words to add\nadded $count word(s)');
     }
     return null;
   }

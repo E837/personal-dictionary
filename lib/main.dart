@@ -219,7 +219,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                      'Remaining Words: ${wordsData.freshWords.length}\nRemaining Phrases: ?'),
+                      'Remaining Words: ${wordsData.freshWords.length}\nRemaining Phrases: ${wordsData.freshPhrases.length}'),
                   Text('Today\'s words: ${todayWords.length}'),
                 ],
               ),
