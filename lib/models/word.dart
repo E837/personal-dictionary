@@ -1,17 +1,22 @@
+import 'package:flutter/material.dart';
+
 enum WType {
   word,
   phrase, // refers to phrases/words I search on Google
 }
 
-class Word {
+class Word with ChangeNotifier {
   final String title;
   late String url;
   final String? translation;
   late final WType type;
-  int level = 1;
-  int stage = 1;
+  int level = 0;
+  int stage = 0;
   int _views = 0;
   bool _isFavorite = false;
+  final List<int> _answers = [];
+  // the list above will keep the levels which we have answered this word's card
+  // and this list will get empty if our answer (translation) is wrong
 
   Word({
     required this.title,
@@ -25,6 +30,25 @@ class Word {
   int get views => _views;
 
   bool get isFavorite => _isFavorite;
+
+  List<int> get answers => List.unmodifiable(_answers);
+
+  void submitCorrectAnswer() {
+    _answers.add(level);
+    notifyListeners();
+  }
+
+  void submitWrongAnswer() {
+    _answers.add(-1);
+    // by adding -1 we are setting a flag to tell that we have answered this one wrong
+    notifyListeners();
+  }
+
+  void reset() {
+    level = 1;
+    stage = 1;
+    _answers.clear();
+  }
 
   void addView() {
     _views++;
@@ -49,22 +73,5 @@ class Word {
 
   static String getPhraseTitle(String messyTitle) {
     return messyTitle.replaceFirst('meaning - Google Search', '').trim();
-  }
-
-  void stageUp() {
-    if (stage >= level) {
-      level++;
-      stage = 1;
-    } else {
-      stage++;
-    }
-
-    // finisher condition
-    if (level == 6 && stage == 2) {
-      // "stage == 2" means that I have answered correctly in lvl 6
-      // and lvl 6 is the final lvl so we should take this word out of "Leitner" box
-      level = 10; // lvl 10 means out of box in my app
-      stage = 1;
-    }
   }
 }

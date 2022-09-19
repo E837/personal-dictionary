@@ -1,17 +1,16 @@
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 
 import 'package:pdict/models/word.dart';
 
 class WordCard extends StatefulWidget {
   final int index;
-  final Word word;
   final bool isFocused;
   const WordCard({
     Key? key,
     required this.index,
-    required this.word,
     required this.isFocused,
   }) : super(key: key);
 
@@ -22,7 +21,7 @@ class WordCard extends StatefulWidget {
 class _WordCardState extends State<WordCard> {
   bool _showTranslation = false;
 
-  List<Widget> showTranslation(bool show) {
+  List<Widget> showTranslation(Word word, bool show) {
     if (!show) {
       return [];
     }
@@ -30,15 +29,18 @@ class _WordCardState extends State<WordCard> {
       // const SizedBox(height: 20),
       // Text('Description: ${widget.word.url}'),
       const SizedBox(height: 20),
-      const Text(
+      const AutoSizeText(
         'ترجمه فارسی',
         style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 30,
         ),
+        minFontSize: 20,
+        maxFontSize: 30,
+        maxLines: 1,
       ),
       AutoSizeText(
-        widget.word.translation ?? 'no translation available for this one',
+        word.translation ?? 'no translation available for this one',
         style: const TextStyle(fontSize: 30),
         maxLines: 3,
         textAlign: TextAlign.center,
@@ -50,10 +52,39 @@ class _WordCardState extends State<WordCard> {
   @override
   Widget build(BuildContext context) {
     final deviceSize = MediaQuery.of(context).size;
+    final word = Provider.of<Word>(context);
+
+    bool isAnswered() {
+      if (word.answers.contains(word.level) || word.answers.contains(-1)) {
+        return true;
+      }
+      return false;
+    }
+
+    Color? setButtonColor() {
+      if (word.answers.contains(word.level)) {
+        return Colors.green[600];
+      } else if (word.answers.contains(-1)) {
+        return Colors.red[600];
+      } else {
+        return null;
+      }
+    }
+
+    Color? setCardColor() {
+      if (word.answers.contains(word.level)) {
+        return Colors.green[100];
+      } else if (word.answers.contains(-1)) {
+        return Colors.red[100];
+      } else if (widget.isFocused) {
+        return (Theme.of(context).colorScheme.primary as MaterialColor).shade50;
+      } else {
+        return null;
+      }
+    }
+
     return Card(
-      color: widget.isFocused
-          ? (Theme.of(context).colorScheme.primary as MaterialColor).shade50
-          : null,
+      color: setCardColor(),
       margin: const EdgeInsets.symmetric(horizontal: 14.0),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
@@ -61,17 +92,23 @@ class _WordCardState extends State<WordCard> {
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: SizedBox(
-          width: deviceSize.width * 0.7,
+          width: 280,
           height: deviceSize.height * 0.6,
           child: Column(
             children: [
               Row(
                 children: [
-                  Text(
-                    widget.word.type == WType.word
-                        ? 'Word ${widget.index + 1}'
-                        : 'Phrase ${widget.index + 1}',
-                    style: Theme.of(context).textTheme.headline5,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        word.type == WType.word
+                            ? 'Word ${widget.index + 1}'
+                            : 'Phrase ${widget.index + 1}',
+                        style: Theme.of(context).textTheme.headline5,
+                      ),
+                      Text('Level ${word.level}'),
+                    ],
                   ),
                   const Spacer(),
                   IconButton(
@@ -85,7 +122,7 @@ class _WordCardState extends State<WordCard> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     AutoSizeText(
-                      widget.word.title,
+                      word.title,
                       style: const TextStyle(fontSize: 35),
                       minFontSize: 14,
                       maxFontSize: 35,
@@ -93,12 +130,12 @@ class _WordCardState extends State<WordCard> {
                       wrapWords: false,
                       textAlign: TextAlign.center,
                     ),
-                    ...showTranslation(_showTranslation),
+                    ...showTranslation(word, _showTranslation),
                   ],
                 ),
               ),
               // const Spacer(),
-              if (!_showTranslation && widget.word.type == WType.word)
+              if (!_showTranslation && word.type == WType.word)
                 ElevatedButton.icon(
                   onPressed: () {
                     setState(() {
@@ -108,18 +145,24 @@ class _WordCardState extends State<WordCard> {
                   icon: const Icon(Icons.translate),
                   label: const Text('See Translation'),
                   style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 40),
+                    minimumSize: const Size(double.infinity, 50),
+                    primary: setButtonColor(),
                   ),
                 ),
-              if (_showTranslation || widget.word.type == WType.phrase)
+              if (_showTranslation || word.type == WType.phrase)
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {},
+                        onPressed: isAnswered()
+                            ? null
+                            : () {
+                                word.submitWrongAnswer();
+                              },
                         icon: const Icon(Icons.warning_amber),
                         label: const Text('Wrong'),
                         style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
                           primary: Colors.red[600],
                         ),
                       ),
@@ -127,25 +170,31 @@ class _WordCardState extends State<WordCard> {
                     const SizedBox(width: 5),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {},
+                        onPressed: isAnswered()
+                            ? null
+                            : () {
+                                word.submitCorrectAnswer();
+                              },
                         icon: const Icon(Icons.task_alt),
                         label: const Text('Correct'),
                         style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
                           primary: Colors.green[600],
                         ),
                       ),
                     ),
                   ],
                 ),
+              const SizedBox(height: 14),
               ElevatedButton.icon(
                 onPressed: () async {
-                  final uri = Uri.parse(widget.word.url);
+                  final uri = Uri.parse(word.url);
                   launchUrl(uri);
                 },
                 icon: const Icon(Icons.search),
                 label: const Text('Search Online'),
                 style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 40),
+                  minimumSize: const Size(double.infinity, 50),
                 ),
               ),
             ],

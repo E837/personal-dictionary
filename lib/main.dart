@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:math';
+// import 'dart:math';
 
 import 'package:html/parser.dart' show parse;
 import 'package:provider/provider.dart';
@@ -13,7 +13,6 @@ import 'package:scroll_snap_list/scroll_snap_list.dart';
 import 'package:file_picker/file_picker.dart';
 
 import 'package:pdict/word_card.dart';
-// import 'temp_data.dart';
 
 void main() {
   runApp(const MyApp());
@@ -48,6 +47,8 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _focusedIndex = 0;
+  // todo: dayNo should be saved on a db
+  int _dayNo = 1;
 
   Future<void> getFile(
       {required Words wordsData, required bool isTable}) async {
@@ -65,14 +66,10 @@ class _MyHomePageState extends State<MyHomePage> {
         debugPrint('--------------');
         var sheet = excel.tables['Saved translations'];
         // "Saved translations" is the sheet name
-        print(sheet?.maxCols);
-        print(sheet?.maxRows);
         final List<String> sources = [];
         final List<String> translations = [];
         for (var row in sheet?.rows ?? []) {
-          print((row[2] as Data).value); // 3rd column contains the source word
           sources.add((row[2] as Data).value);
-          print((row[3] as Data).value); // 4th column contains the translation
           translations.add((row[3] as Data).value);
         }
         wordsData.fetchWords(sources, translations);
@@ -84,9 +81,7 @@ class _MyHomePageState extends State<MyHomePage> {
         final List<String> sources = [];
         final List<String> urls = [];
         for (var e in elements) {
-          print(e.text);
           sources.add(Word.getPhraseTitle(e.text));
-          print(e.attributes['href']);
           urls.add(e.attributes['href'] ?? '');
         }
         wordsData.fetchPhrases(sources, urls);
@@ -98,9 +93,20 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final deviceSize = MediaQuery.of(context).size;
+    // final deviceSize = MediaQuery.of(context).size;
     final wordsData = Provider.of<Words>(context);
-    final words = wordsData.words;
+    final todayWords = wordsData.getTodayWords();
+
+    bool allAnswered() {
+      for (var word in todayWords) {
+        if (!(word.answers.contains(word.level) || word.answers.contains(-1))) {
+          // if we are here, so we have not answered a word (at least)
+          return false;
+        }
+      }
+      return true;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -136,20 +142,20 @@ class _MyHomePageState extends State<MyHomePage> {
             flex: 1,
             child: Center(
               child: Text(
-                'Day #?',
+                'Day #$_dayNo',
                 style: Theme.of(context).textTheme.headline4,
               ),
             ),
           ),
           Expanded(
             flex: 6,
-            child: words.isEmpty
+            child: todayWords.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: const [
                         Text(
-                          'It\'s cozy here',
+                          'It\'s quiet here',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 30),
                         ),
@@ -163,23 +169,31 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   )
                 : ScrollSnapList(
-                    // todo: we need a way to keep items alive (or keep their state)
-                    // todo: card positioning has bugs (cards don't stop at center + last card buttons don't work cuz of it i think)
-                    itemCount: min(words.length, 20),
+                    itemCount: todayWords.length,
                     itemBuilder: (context, index) {
-                      return WordCard(
-                        index: index,
-                        word: words[index],
-                        isFocused: _focusedIndex == index,
+                      return ChangeNotifierProvider.value(
+                        value: todayWords[index],
+                        child: WordCard(
+                          index: index,
+                          isFocused: _focusedIndex == index,
+                        ),
                       );
                     },
+                    scrollDirection: Axis.horizontal,
                     onItemFocus: (index) {
                       setState(() {
                         _focusedIndex = index;
                       });
                     },
-                    itemSize: deviceSize.width * 0.89,
-                    // scrollPhysics: const BouncingScrollPhysics(),
+                    // todo: this 348 is strictly related to card size in "word_card.dart" and we should find a way to make it responsive (not hardcoded size)
+                    itemSize: 348,
+                    scrollPhysics: const BouncingScrollPhysics(),
+                    // dynamicItemSize: true,
+                    // dynamicSizeEquation: (difference) {
+                    //   return 1 - min(difference.abs() / 900, 0.1);
+                    // },
+                    duration: 100,
+                    curve: Curves.ease,
                   ),
           ),
           Expanded(
@@ -190,10 +204,25 @@ class _MyHomePageState extends State<MyHomePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                      'Remaining Words: ${words.length}\nRemaining Phrases: ?'),
-                  Text('Today\'s words: ${min(words.length, 20)}'),
+                      'Remaining Words: ${wordsData.freshWords.length}\nRemaining Phrases: ?'),
+                  Text('Today\'s words: ${todayWords.length}'),
                 ],
               ),
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: ElevatedButton(
+              onPressed: allAnswered() && todayWords.isNotEmpty
+                  ? () {
+                      setState(() {
+                        wordsData.addEightNewWordsToBox();
+                        wordsData.getTodayWords();
+                        _dayNo++;
+                      });
+                    }
+                  : null,
+              child: const Text('Next Day'),
             ),
           ),
         ],
