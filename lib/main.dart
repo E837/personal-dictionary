@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 // import 'dart:math';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:html/dom.dart' show Document;
 import 'package:html/parser.dart' show parse;
@@ -18,11 +19,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:pdict/word_card.dart';
 
 void main() {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  MyApp({Key? key}) : super(key: key);
+
+  final Future<FirebaseApp> _fbApp = Firebase.initializeApp();
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +38,25 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.purple,
           fontFamily: GoogleFonts.ubuntu().fontFamily,
         ),
-        home: const MyHomePage(),
+        home: FutureBuilder(
+          future: _fbApp,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              debugPrint('You have an error! ${snapshot.error.toString()}');
+              return const Center(
+                child: Text(
+                  'Something went wrong initializing the Firebase core service',
+                ),
+              );
+            } else if (snapshot.hasData) {
+              return const MyHomePage();
+            } else {
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
+            }
+          },
+        ),
         debugShowCheckedModeBanner: false,
       ),
     );
