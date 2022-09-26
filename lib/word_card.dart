@@ -20,6 +20,7 @@ class WordCard extends StatefulWidget {
 
 class _WordCardState extends State<WordCard> {
   bool _showTranslation = false;
+  bool _isLoading = false;
 
   List<Widget> showTranslation(Word word, bool show) {
     if (!show) {
@@ -154,10 +155,16 @@ class _WordCardState extends State<WordCard> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: isAnswered()
+                        onPressed: isAnswered() || _isLoading
                             ? null
-                            : () {
-                                word.submitWrongAnswer();
+                            : () async {
+                                setState(() {
+                                  _isLoading = true;
+                                });
+                                await word.submitAnswer(isCorrect: false);
+                                setState(() {
+                                  _isLoading = false;
+                                });
                               },
                         icon: const Icon(Icons.warning_amber),
                         label: const Text('Wrong'),
@@ -170,10 +177,16 @@ class _WordCardState extends State<WordCard> {
                     const SizedBox(width: 5),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: isAnswered()
+                        onPressed: isAnswered() || _isLoading
                             ? null
-                            : () {
-                                word.submitCorrectAnswer();
+                            : () async {
+                                setState(() {
+                                  _isLoading = true;
+                                });
+                                await word.submitAnswer(isCorrect: true);
+                                setState(() {
+                                  _isLoading = false;
+                                });
                               },
                         icon: const Icon(Icons.task_alt),
                         label: const Text('Correct'),

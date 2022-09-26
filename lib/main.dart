@@ -1,22 +1,19 @@
 import 'dart:io';
 import 'dart:typed_data';
-// import 'dart:math';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:html/dom.dart' show Document;
 import 'package:html/parser.dart' show parse;
 import 'package:provider/provider.dart';
-
 import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:pdict/models/word.dart';
-import 'package:pdict/models/words.dart';
-import 'package:scroll_snap_list/scroll_snap_list.dart';
 import 'package:file_picker/file_picker.dart';
 
-import 'package:pdict/word_card.dart';
+import 'package:pdict/models/word.dart';
+import 'package:pdict/cards_list.dart';
+import 'package:pdict/models/words.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,8 +27,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (ctx) => Words(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (ctx) => Words()),
+      ],
       child: MaterialApp(
         title: 'PersonalDict',
         theme: ThemeData(
@@ -63,19 +62,10 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class MyHomePage extends StatefulWidget {
+class MyHomePage extends StatelessWidget {
   const MyHomePage({Key? key}) : super(key: key);
 
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _focusedIndex = 0;
-  // todo: dayNo should be saved on a db
-  int _dayNo = 1;
-
-  Future<void> getFile(
+  Future<void> pickFile(
       {required Words wordsData, required bool isTable}) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -104,7 +94,7 @@ class _MyHomePageState extends State<MyHomePage> {
           sources.add((row[2] as Data).value);
           translations.add((row[3] as Data).value);
         }
-        wordsData.fetchWords(sources, translations);
+        await wordsData.parseNewWordsAndSendToFirestore(sources, translations);
       } else {
         // html file
         late final Document document;
@@ -121,7 +111,7 @@ class _MyHomePageState extends State<MyHomePage> {
           sources.add(Word.getPhraseTitle(e.text));
           urls.add(e.attributes['href'] ?? '');
         }
-        wordsData.fetchPhrases(sources, urls);
+        await wordsData.parseNewPhrasesAndSendToFirestore(sources, urls);
       }
     } else {
       // User canceled the picker
@@ -130,19 +120,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('building home page');
     // final deviceSize = MediaQuery.of(context).size;
-    final wordsData = Provider.of<Words>(context);
-    final todayWords = wordsData.getTodayWords();
-
-    bool allAnswered() {
-      for (var word in todayWords) {
-        if (!(word.answers.contains(word.level) || word.answers.contains(-1))) {
-          // if we are here, so we have not answered a word (at least)
-          return false;
-        }
-      }
-      return true;
-    }
+    final wordsData = Provider.of<Words>(context, listen: false);
+    wordsData.fetchMetaData();
+    // final metadata = Provider.of<Metadata>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -154,14 +136,14 @@ class _MyHomePageState extends State<MyHomePage> {
         actions: [
           IconButton(
             onPressed: () {
-              getFile(wordsData: wordsData, isTable: false);
+              pickFile(wordsData: wordsData, isTable: false);
             },
             icon: const Icon(Icons.code),
             tooltip: 'Import .html',
           ),
           IconButton(
             onPressed: () {
-              getFile(wordsData: wordsData, isTable: true);
+              pickFile(wordsData: wordsData, isTable: true);
             },
             icon: const Icon(Icons.playlist_add),
             tooltip: 'Import .xlsx',
@@ -173,103 +155,85 @@ class _MyHomePageState extends State<MyHomePage> {
           tooltip: 'Export .json',
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            flex: 1,
-            child: Center(
-              child: Text(
-                'Day #$_dayNo',
-                style: Theme.of(context).textTheme.headline4,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 6,
-            child: todayWords.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text(
-                          'It\'s quiet here',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 30),
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          'no words, no phrases,\nand nothing else...',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 20),
-                        ),
-                      ],
-                    ),
-                  )
-                : ScrollSnapList(
-                    itemCount: todayWords.length,
-                    itemBuilder: (context, index) {
-                      return ChangeNotifierProvider.value(
-                        value: todayWords[index],
-                        child: WordCard(
-                          index: index,
-                          isFocused: _focusedIndex == index,
-                        ),
-                      );
-                    },
-                    scrollDirection: Axis.horizontal,
-                    onItemFocus: (index) {
-                      setState(() {
-                        _focusedIndex = index;
-                      });
-                    },
-                    // todo: this 348 is strictly related to card size in "word_card.dart" and we should find a way to make it responsive (not hardcoded size)
-                    itemSize: 348,
-                    scrollPhysics: const BouncingScrollPhysics(),
-                    // dynamicItemSize: true,
-                    // dynamicSizeEquation: (difference) {
-                    //   return 1 - min(difference.abs() / 900, 0.1);
-                    // },
-                    duration: 100,
-                    curve: Curves.ease,
+      body: Consumer<Words>(
+        builder: (context, data, child) {
+          return Column(
+            children: [
+              Expanded(
+                flex: 1,
+                child: Center(
+                  child: Text(
+                    'Day #${data.fbDayNo}',
+                    style: Theme.of(context).textTheme.headline4,
                   ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                      'Remaining Words: ${wordsData.freshWords.length}\nRemaining Phrases: ${wordsData.freshPhrases.length}'),
-                  Text('Today\'s words: ${todayWords.length}'),
-                ],
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: ElevatedButton(
-              onPressed: allAnswered()
-                  ? () {
-                      setState(() {
-                        final response = wordsData.addEightNewWordsToBox();
-                        if (response != null) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text(
-                            response,
-                            textAlign: TextAlign.center,
-                          )));
+              child!, // child is the CardsList widget
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                          'Remaining Words: ${data.fbFreshWordsLength}\nRemaining Phrases: ${data.fbFreshPhrasesLength}'),
+                      // Text('Today\'s words: ${todayWords.length}'),
+                      Text(
+                          'Today\'s words: ${data.getWordsToReadFromWordsInBox().length}'),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 1,
+                child: Consumer<Words>(
+                  builder: (context, wordsData, _) {
+                    bool allAnswered() {
+                      for (var word in wordsData.wordsInBox) {
+                        if (!(word.answers.contains(word.level) ||
+                            word.answers.contains(-1))) {
+                          // if we are here, so we have not answered a word (at least)
+                          return false;
                         }
-                        wordsData.getTodayWords();
-                        _dayNo++;
-                      });
+                      }
+                      return true;
                     }
-                  : null,
-              child: const Text('Next Day'),
-            ),
-          ),
-        ],
+
+                    return ElevatedButton(
+                      onPressed: allAnswered()
+                          ? () async {
+                              final scaffoldMessenger =
+                                  ScaffoldMessenger.of(context);
+                              final response = await wordsData.makeNewDay();
+                              // if "response != null" means we've got an error (it returns the error msg)
+                              if (response != null) {
+                                scaffoldMessenger.showSnackBar(SnackBar(
+                                    content: Text(
+                                  response,
+                                  textAlign: TextAlign.center,
+                                )));
+                              }
+                              // if (response == null ||
+                              //     !response.contains('dayNo')) {
+                              //   // if we have no errors OR at least no errors about "dayNo", do this
+                              //   wordsData.dayNoUp();
+                              // }
+                              // wordsData.wordsInBox = await wordsData.fetchBoxWords();
+                            }
+                          : null,
+                      child: const Text('Next Day'),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
+        child: const Expanded(
+          flex: 6,
+          child: CardsList(),
+        ),
       ),
     );
   }

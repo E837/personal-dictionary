@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'word.dart';
 
@@ -9,62 +12,198 @@ class Words with ChangeNotifier {
   List<Word> wordsInBox = [];
   List<Word> doneWords = [];
 
-  void fetchWords(List<String> sources, List<String> translations) {
-    final titles = _getTitles(isPhrase: false);
-    for (int i = 0; i < sources.length; i++) {
-      if (!titles.contains(sources[i].toLowerCase().trim())) {
-        freshWords.add(Word(
+  /// ---------------------- metadata store -----------------------
+
+  int _fbWordsLength = 0; // fb = firebase
+  int _fbFreshWordsLength = 0;
+  int _fbFreshPhrasesLength = 0;
+  int _fbDayNo = 0;
+
+  int get fbWordsLength => _fbWordsLength;
+  int get fbFreshWordsLength => _fbFreshWordsLength;
+  int get fbFreshPhrasesLength => _fbFreshPhrasesLength;
+  int get fbDayNo => _fbDayNo;
+
+  Future<void> fetchMetaData() async {
+    bool hasError = false;
+
+    final rawMetadata = await FirebaseFirestore.instance
+        .collection('metadata')
+        .get()
+        .catchError((error) {
+      debugPrint('error while getting metadata\nError: $error');
+      hasError = true;
+    });
+    if (hasError) {
+      return;
+    }
+
+    //converting firestore data to Map
+    final Map<String, dynamic> metadata = {};
+    for (var doc in rawMetadata.docs) {
+      metadata[doc.id] = doc.data()['value'];
+    }
+
+    _fbFreshWordsLength = metadata['freshWordsLength'] ?? 0;
+    if (metadata['freshWordsLength'] == null) {
+      // initializing the freshWords length on firestore
+      await FirebaseFirestore.instance
+          .collection('metadata')
+          .doc('freshWordsLength')
+          .set({'value': 0}).catchError((error) {
+        debugPrint('setting freshWords length as 0 failed\nError $error');
+      });
+    }
+
+    _fbDayNo = metadata['dayNo'] ?? 0;
+    if (metadata['dayNo'] == null) {
+      // initializing dayNo on firestore
+      await FirebaseFirestore.instance
+          .collection('metadata')
+          .doc('dayNo')
+          .set({'value': 0}).catchError((error) {
+        debugPrint('setting dayNo as 0 failed\nError $error');
+      });
+    }
+
+    _fbWordsLength = metadata['wordsLength'] ?? 0;
+
+    notifyListeners();
+  }
+
+  Future<void> dayNoUp() async {
+    await FirebaseFirestore.instance
+        .collection('metadata')
+        .doc('dayNo')
+        .update({'value': FieldValue.increment(1)}).then((_) {
+      _fbDayNo++;
+      notifyListeners();
+    }).catchError((error) {
+      debugPrint('increasing dayNo on firestore failed\nError $error');
+      throw Exception('dayNo incrementation failed');
+    });
+  }
+
+  /// ---------------------- end of metadata store -----------------------
+
+  Future<void> parseNewWordsAndSendToFirestore(
+      List<String> sources, List<String> translations) async {
+    await fetchMetaData();
+    for (int i = _fbWordsLength; i < sources.length; i++) {
+      // by the line below we initialize a temp word to configure it's data structure...
+      // but we won't save it's id anywhere but we keep the word with the id we get from firebase
+      final wordWithTempId = Word(
+        id: 'temp',
+        title: sources[i],
+        translation: translations[i],
+      );
+
+      await FirebaseFirestore.instance
+          .collection('freshWords')
+          .add(wordWithTempId.toMap)
+          .then((value) async {
+        debugPrint('word $i uploaded successfully -> id: ${value.id}');
+        final thisWord = Word(
+          id: value.id,
           title: sources[i],
           translation: translations[i],
-        ));
-      }
+        );
+        freshWords.add(thisWord);
+        await FirebaseFirestore.instance
+            .collection('metadata')
+            .doc('freshWordsLength')
+            .update({'value': FieldValue.increment(1)})
+            .then((_) => _fbFreshWordsLength++)
+            .catchError((error) {
+              debugPrint('increasing freshWordsLength failed\nError: $error');
+            });
+      }).catchError((error) {
+        debugPrint('word $i failed. error: $error');
+      });
     }
+
     if (wordsInBox.isEmpty) {
-      addEightNewWordsToBox();
+      await makeNewDay();
     }
+
+    // sending the words length to firestore
+    await FirebaseFirestore.instance
+        .collection('metadata')
+        .doc('wordsLength')
+        .set({'value': max(_fbWordsLength, sources.length)});
+
     notifyListeners();
   }
 
-  void fetchPhrases(List<String> sources, List<String> urls) {
-    final titles = _getTitles(isPhrase: true);
+  Future<void> parseNewPhrasesAndSendToFirestore(
+      List<String> sources, List<String> urls) async {
+    final lengthData = await FirebaseFirestore.instance
+        .collection('metadata')
+        .doc('phrasesLength')
+        .get();
+    int currentLength = lengthData.data()?['value'] ?? 0;
+
     for (int i = 0; i < sources.length; i++) {
-      if (!titles.contains(sources[i].toLowerCase().trim())) {
-        freshPhrases.add(Word(
+      // by the line below we initialize a temp word to configure it's data structure...
+      // but we won't save it's id anywhere but we keep the word with the id we get from firebase
+      final wordWithTempId = Word(
+        id: 'temp',
+        title: sources[i],
+        url: urls[i],
+      );
+
+      await FirebaseFirestore.instance
+          .collection('freshPhrases')
+          .add(wordWithTempId.toMap)
+          .then((value) {
+        debugPrint('phrase $i uploaded successfully -> id: ${value.id}');
+        final thisWord = Word(
+          id: value.id,
           title: sources[i],
           url: urls[i],
-        ));
-      }
+        );
+        freshPhrases.add(thisWord);
+      }).catchError((error) {
+        debugPrint('word $i failed. error: $error');
+      });
     }
+
     if (wordsInBox.isEmpty) {
-      addEightNewWordsToBox();
+      makeNewDay();
     }
+
+    // sending the words length to firestore
+    await FirebaseFirestore.instance
+        .collection('metadata')
+        .doc('phrasesLength')
+        .set({'value': max(currentLength, sources.length)});
     notifyListeners();
   }
 
-  List<String> _getTitles({required bool isPhrase}) {
-    late final List<Word> totalWords;
-    if (isPhrase) {
-      totalWords = freshPhrases + wordsInBox;
-      // "wordsInBox" contains both phrases and words but it doesn't matter
-    } else {
-      totalWords = freshWords + wordsInBox;
+  Future<String?> makeNewDay({int wCount = 8}) async {
+    // wCount is the count of words the user (me) wants to learn
+    // increasing the dayNo on firestore
+    try {
+      await dayNoUp();
+    } catch (error) {
+      // if dayNo increment fails, we return and don't let the method to continue it's job
+      return (error.toString());
     }
-    return totalWords.map((e) => e.title.toLowerCase().trim()).toList();
-  }
 
-  String? addEightNewWordsToBox() {
     int count = 0; // count of chosen words
+
     // handling words of the previous day
     for (var word in wordsInBox) {
       // fist, we should stage up all the words in box
-      stageUp(word);
+      await stageUp(word);
       // second, we choose the words we've answered wrong the day before
       if (word.answers.contains(-1)) {
-        word.reset();
+        await word.reset();
         // these words are already in the box but we are putting them at the first lvl
         count++;
       }
     }
+
     // we are going to add 1 phrase and 7 words to the box
     // adding fresh phrases to box
     int i = 0; // index of current word
@@ -72,6 +211,28 @@ class Words with ChangeNotifier {
       if (freshPhrases[i].level == 0 && freshPhrases[i].stage == 0) {
         freshPhrases[i].level = 1;
         freshPhrases[i].stage = 1;
+        await FirebaseFirestore.instance
+            .collection('wordsInBox')
+            .doc(freshPhrases[i].id)
+            .set(freshPhrases[i].toMap)
+            .then((value) {
+          debugPrint(
+              'added phrase "${freshPhrases[i].title}" to the box successfully');
+        }).catchError((error) {
+          debugPrint(
+              'adding phrase "${freshPhrases[i].title}" to the box failed');
+        });
+        await FirebaseFirestore.instance
+            .collection('freshPhrases')
+            .doc(freshPhrases[i].id)
+            .delete()
+            .then((value) {
+          debugPrint(
+              'deleted phrase "${freshPhrases[i].title}" from the freshPhrases list');
+        }).catchError((error) {
+          debugPrint(
+              'deleting phrase "${freshPhrases[i].title}" from the freshPhrases failed');
+        });
         wordsInBox.add(freshPhrases[i]);
         freshPhrases.removeAt(i);
         count++;
@@ -81,36 +242,94 @@ class Words with ChangeNotifier {
       }
       i++;
     }
+
     // adding fresh words to box
-    int j = 0; // index of current word
-    while (count < 8 && j < freshWords.length) {
-      if (freshWords[j].level == 0 && freshWords[j].stage == 0) {
-        freshWords[j].level = 1;
-        freshWords[j].stage = 1;
-        wordsInBox.add(freshWords[j]);
-        freshWords.removeAt(j);
-        count++;
-        // now we should reset the index (j)
-        j = -1;
-        // we set i to -1 because it will become 0 by the line below (j++) and so we are resetting the i to 0
-      }
-      j++;
+    final int needCount = max(wCount - count, 0);
+    final freshWordsData = await FirebaseFirestore.instance
+        .collection('freshWords')
+        .limit(needCount)
+        // for count to reach wCount (and "max" prevents negative numbers)
+        .get()
+        .catchError((error) {
+      debugPrint('fetching freshWords from firestore failed\nError: $error');
+    });
+    freshWords =
+        freshWordsData.docs.map((w) => Word.parseMap(w.id, w.data())).toList();
+
+    if (freshWords.isNotEmpty) {
+      // decreasing the freshWordsLength
+      // we don't need to wait for this to happen, because we don't need the info right now
+      FirebaseFirestore.instance
+          .collection('metadata')
+          .doc('freshWordsLength')
+          .update({'value': FieldValue.increment(-needCount)})
+          // by setting "-needCount" (the "-" is important) we are indeed decreasing the freshWordsLength
+          .then((_) => _fbFreshWordsLength--)
+          .catchError((error) {
+            debugPrint('decreasing freshWordsLength failed\nError: $error');
+          });
     }
 
+    final freshWordsCopy = List.of(freshWords);
+    for (var word in freshWordsCopy) {
+      if (word.level == 0 && word.stage == 0) {
+        word.level = 1;
+        word.stage = 1;
+        await FirebaseFirestore.instance
+            .collection('wordsInBox')
+            .doc(word.id)
+            .set(word.toMap)
+            .then((value) {
+          debugPrint('added word "${word.title}" to the box successfully');
+          wordsInBox.add(word);
+        }).catchError((error) {
+          debugPrint('adding word "${word.title}" to the box failed');
+        });
+        await FirebaseFirestore.instance
+            .collection('freshWords')
+            .doc(word.id)
+            .delete()
+            .then((value) {
+          debugPrint('deleted word "${word.title}" from the freshWords list');
+          freshWords.remove(word);
+        }).catchError((error) {
+          debugPrint(
+              'deleting word "${word.title}" from the freshWords failed');
+        });
+        count++;
+      }
+    }
+
+    notifyListeners();
+
     // in case we don't have enough fresh words
-    if (count < 8) {
+    if (count < wCount) {
       return ('We don\'nt have enough fresh words to add\nadded $count word(s)');
     }
+
     return null;
   }
 
-  void stageUp(Word word) {
+  Future<void> stageUp(Word word) async {
+    final doc =
+        FirebaseFirestore.instance.collection('wordsInBox').doc(word.id);
+    final oldLevel = word.level;
+    final oldStage = word.stage;
     if (word.stage >= word.level) {
       word.level++;
       word.stage = 1;
     } else {
       word.stage++;
     }
+    // updating firestore data
+    await doc.update({
+      'level': word.level,
+      'stage': word.stage,
+    }).catchError((error) {
+      debugPrint('stageUp process failed\nError: $error');
+      word.level = oldLevel;
+      word.stage = oldStage;
+    });
 
     // finisher condition
     if (word.level == 6 && word.stage == 2) {
@@ -120,10 +339,44 @@ class Words with ChangeNotifier {
       word.stage = 0;
       doneWords.add(word);
       wordsInBox.remove(word);
+
+      final newDoc =
+          FirebaseFirestore.instance.collection('doneWords').doc(word.id);
+
+      await newDoc.set(word.toMap).then((_) {
+        // deleting existing doc from "wordsInBox"
+        doc.delete().then((_) async {
+          await newDoc.update({
+            'level': word.level,
+            'stage': word.stage,
+          }).catchError((error) {
+            debugPrint(
+                'updating level/stage of this doneWord failed\nError: $error');
+            word.level = oldLevel;
+            word.stage = oldStage;
+          });
+        }).catchError((error) {
+          debugPrint('removing item from "wordsInBox" failed\nError: $error');
+          wordsInBox.add(word);
+        });
+      }).catchError((error) {
+        debugPrint('adding item to "doneWords" failed\nError: $error');
+        doneWords.remove(word);
+      });
     }
   }
 
-  List<Word> getTodayWords() {
+  Future<List<Word>> fetchBoxWords() async {
+    debugPrint('============== fetching box words');
+    final wordsData =
+        await FirebaseFirestore.instance.collection('wordsInBox').get();
+    wordsInBox = wordsData.docs.map((w) {
+      return Word.parseMap(w.id, w.data());
+    }).toList();
+    return getWordsToReadFromWordsInBox();
+  }
+
+  List<Word> getWordsToReadFromWordsInBox() {
     final List<Word> result = [];
     for (Word w in wordsInBox) {
       if (w.level > 0 && w.level < 10 && w.stage == 1) {
