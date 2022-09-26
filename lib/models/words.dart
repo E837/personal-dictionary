@@ -15,11 +15,13 @@ class Words with ChangeNotifier {
   /// ---------------------- metadata store -----------------------
 
   int _fbWordsLength = 0; // fb = firebase
+  int _fbPhrasesLength = 0;
   int _fbFreshWordsLength = 0;
   int _fbFreshPhrasesLength = 0;
   int _fbDayNo = 0;
 
   int get fbWordsLength => _fbWordsLength;
+  int get fbPhrasesLength => _fbPhrasesLength;
   int get fbFreshWordsLength => _fbFreshWordsLength;
   int get fbFreshPhrasesLength => _fbFreshPhrasesLength;
   int get fbDayNo => _fbDayNo;
@@ -55,6 +57,17 @@ class Words with ChangeNotifier {
       });
     }
 
+    _fbFreshPhrasesLength = metadata['freshPhrasesLength'] ?? 0;
+    if (metadata['freshPhrasesLength'] == null) {
+      // initializing the freshPhrases length on firestore
+      await FirebaseFirestore.instance
+          .collection('metadata')
+          .doc('freshPhrasesLength')
+          .set({'value': 0}).catchError((error) {
+        debugPrint('setting freshPhrases length as 0 failed\nError $error');
+      });
+    }
+
     _fbDayNo = metadata['dayNo'] ?? 0;
     if (metadata['dayNo'] == null) {
       // initializing dayNo on firestore
@@ -67,6 +80,7 @@ class Words with ChangeNotifier {
     }
 
     _fbWordsLength = metadata['wordsLength'] ?? 0;
+    _fbPhrasesLength = metadata['phrasesLength'] ?? 0;
 
     notifyListeners();
   }
@@ -137,13 +151,8 @@ class Words with ChangeNotifier {
 
   Future<void> parseNewPhrasesAndSendToFirestore(
       List<String> sources, List<String> urls) async {
-    final lengthData = await FirebaseFirestore.instance
-        .collection('metadata')
-        .doc('phrasesLength')
-        .get();
-    int currentLength = lengthData.data()?['value'] ?? 0;
-
-    for (int i = 0; i < sources.length; i++) {
+    await fetchMetaData();
+    for (int i = _fbPhrasesLength; i < sources.length; i++) {
       // by the line below we initialize a temp word to configure it's data structure...
       // but we won't save it's id anywhere but we keep the word with the id we get from firebase
       final wordWithTempId = Word(
@@ -155,7 +164,7 @@ class Words with ChangeNotifier {
       await FirebaseFirestore.instance
           .collection('freshPhrases')
           .add(wordWithTempId.toMap)
-          .then((value) {
+          .then((value) async {
         debugPrint('phrase $i uploaded successfully -> id: ${value.id}');
         final thisWord = Word(
           id: value.id,
@@ -163,20 +172,29 @@ class Words with ChangeNotifier {
           url: urls[i],
         );
         freshPhrases.add(thisWord);
+        await FirebaseFirestore.instance
+            .collection('metadata')
+            .doc('freshPhrasesLength')
+            .update({'value': FieldValue.increment(1)})
+            .then((_) => _fbFreshPhrasesLength++)
+            .catchError((error) {
+              debugPrint('increasing freshPhrasesLength failed\nError: $error');
+            });
       }).catchError((error) {
-        debugPrint('word $i failed. error: $error');
+        debugPrint('phrase $i failed. error: $error');
       });
     }
 
     if (wordsInBox.isEmpty) {
-      makeNewDay();
+      await makeNewDay();
     }
 
     // sending the words length to firestore
     await FirebaseFirestore.instance
         .collection('metadata')
         .doc('phrasesLength')
-        .set({'value': max(currentLength, sources.length)});
+        .set({'value': max(_fbPhrasesLength, sources.length)});
+
     notifyListeners();
   }
 
@@ -205,46 +223,66 @@ class Words with ChangeNotifier {
     }
 
     // we are going to add 1 phrase and 7 words to the box
-    // adding fresh phrases to box
-    int i = 0; // index of current word
-    while (count < 1 && i < freshPhrases.length) {
-      if (freshPhrases[i].level == 0 && freshPhrases[i].stage == 0) {
-        freshPhrases[i].level = 1;
-        freshPhrases[i].stage = 1;
+    /// --------- adding fresh phrases to box ---------
+    int needCount = 1;
+    final freshPhrasesData = await FirebaseFirestore.instance
+        .collection('freshPhrases')
+        .limit(needCount)
+        .get()
+        .catchError((error) {
+      debugPrint('fetching freshPhrases from firestore failed\nError: $error');
+    });
+    freshPhrases = freshPhrasesData.docs
+        .map((w) => Word.parseMap(w.id, w.data()))
+        .toList();
+
+    if (freshPhrases.isNotEmpty) {
+      // decreasing the freshPhrasesLength
+      // we don't need to wait for this to happen, because we don't need the info right now
+      FirebaseFirestore.instance
+          .collection('metadata')
+          .doc('freshPhrasesLength')
+          .update({'value': FieldValue.increment(-needCount)})
+          // by setting "-needCount" (the "-" is important) we are indeed decreasing the freshPhrasesLength
+          .then((_) => _fbFreshPhrasesLength--)
+          .catchError((error) {
+            debugPrint('decreasing freshPhrasesLength failed\nError: $error');
+          });
+    }
+
+    final freshPhrasesCopy = List.of(freshPhrases);
+    for (var word in freshPhrasesCopy) {
+      if (word.level == 0 && word.stage == 0) {
+        word.level = 1;
+        word.stage = 1;
         await FirebaseFirestore.instance
             .collection('wordsInBox')
-            .doc(freshPhrases[i].id)
-            .set(freshPhrases[i].toMap)
+            .doc(word.id)
+            .set(word.toMap)
             .then((value) {
-          debugPrint(
-              'added phrase "${freshPhrases[i].title}" to the box successfully');
+          debugPrint('added phrase "${word.title}" to the box successfully');
+          wordsInBox.add(word);
         }).catchError((error) {
-          debugPrint(
-              'adding phrase "${freshPhrases[i].title}" to the box failed');
+          debugPrint('adding phrase "${word.title}" to the box failed');
         });
         await FirebaseFirestore.instance
             .collection('freshPhrases')
-            .doc(freshPhrases[i].id)
+            .doc(word.id)
             .delete()
             .then((value) {
           debugPrint(
-              'deleted phrase "${freshPhrases[i].title}" from the freshPhrases list');
+              'deleted phrase "${word.title}" from the freshPhrases list');
+          freshPhrases.remove(word);
         }).catchError((error) {
           debugPrint(
-              'deleting phrase "${freshPhrases[i].title}" from the freshPhrases failed');
+              'deleting phrase "${word.title}" from the freshPhrases failed');
         });
-        wordsInBox.add(freshPhrases[i]);
-        freshPhrases.removeAt(i);
         count++;
-        // now we should reset the index (i)
-        i = -1;
-        // we set i to -1 because it will become 0 by the line below (i++) and so we are resetting the i to 0
       }
-      i++;
     }
 
-    // adding fresh words to box
-    final int needCount = max(wCount - count, 0);
+    /// --------- adding fresh words to box ---------
+    needCount = max(wCount - count, 0);
     final freshWordsData = await FirebaseFirestore.instance
         .collection('freshWords')
         .limit(needCount)
