@@ -47,37 +47,10 @@ class Words with ChangeNotifier {
     }
 
     _fbFreshWordsLength = metadata['freshWordsLength'] ?? 0;
-    if (metadata['freshWordsLength'] == null) {
-      // initializing the freshWords length on firestore
-      await FirebaseFirestore.instance
-          .collection('metadata')
-          .doc('freshWordsLength')
-          .set({'value': 0}).catchError((error) {
-        debugPrint('setting freshWords length as 0 failed\nError $error');
-      });
-    }
 
     _fbFreshPhrasesLength = metadata['freshPhrasesLength'] ?? 0;
-    if (metadata['freshPhrasesLength'] == null) {
-      // initializing the freshPhrases length on firestore
-      await FirebaseFirestore.instance
-          .collection('metadata')
-          .doc('freshPhrasesLength')
-          .set({'value': 0}).catchError((error) {
-        debugPrint('setting freshPhrases length as 0 failed\nError $error');
-      });
-    }
 
     _fbDayNo = metadata['dayNo'] ?? 0;
-    if (metadata['dayNo'] == null) {
-      // initializing dayNo on firestore
-      await FirebaseFirestore.instance
-          .collection('metadata')
-          .doc('dayNo')
-          .set({'value': 0}).catchError((error) {
-        debugPrint('setting dayNo as 0 failed\nError $error');
-      });
-    }
 
     _fbWordsLength = metadata['wordsLength'] ?? 0;
     _fbPhrasesLength = metadata['phrasesLength'] ?? 0;
