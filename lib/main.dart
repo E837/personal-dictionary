@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:html/dom.dart' show Document;
 import 'package:html/parser.dart' show parse;
+import 'package:pdict/next_day_button.dart';
 import 'package:provider/provider.dart';
 import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
@@ -158,17 +159,6 @@ class MyHomePage extends StatelessWidget {
       ),
       body: Consumer<Words>(
         builder: (context, data, child) {
-          bool allAnswered() {
-            for (var word in wordsData.wordsInBox) {
-              if (!(word.answers.contains(word.level) ||
-                  word.answers.contains(-1))) {
-                // if we are here, so we have not answered a word (at least)
-                return false;
-              }
-            }
-            return true;
-          }
-
           return Column(
             children: [
               Expanded(
@@ -196,29 +186,8 @@ class MyHomePage extends StatelessWidget {
                   ),
                 ),
               ),
-              ElevatedButton(
-                onPressed: allAnswered()
-                    ? () async {
-                        final scaffoldMessenger = ScaffoldMessenger.of(context);
-                        final response = await wordsData.makeNewDay();
-                        scaffoldMessenger.showSnackBar(SnackBar(
-                            content: Text(
-                          response ?? 'Now you can restart the app',
-                          // if "response != null" means we've got an error (it returns the error msg)
-                          textAlign: TextAlign.center,
-                        )));
-                      }
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  fixedSize: const Size(320, 60),
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(14),
-                    ),
-                  ),
-                ),
-                child: const Text('NEXT DAY'),
-              ),
+              // the NextDayButton widget has the "const" so it won't rebuild from here, it has it's own listener inside (and it's good)
+              const NextDayButton(),
             ],
           );
         },

@@ -70,7 +70,7 @@ class Word with ChangeNotifier {
   }
 
   Future<void> reset() async {
-    print('inside reset');
+    debugPrint('inside reset');
     final oldLevel = level;
     final oldStage = stage;
     final oldAnswers = _answers;
