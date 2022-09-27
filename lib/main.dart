@@ -136,24 +136,25 @@ class MyHomePage extends StatelessWidget {
         actions: [
           IconButton(
             onPressed: () {
-              pickFile(wordsData: wordsData, isTable: false);
-            },
-            icon: const Icon(Icons.code),
-            tooltip: 'Import .html',
-          ),
-          IconButton(
-            onPressed: () {
               pickFile(wordsData: wordsData, isTable: true);
             },
             icon: const Icon(Icons.playlist_add),
             tooltip: 'Import .xlsx',
           ),
         ],
+        // for now we don't have any export functionality so I placed remaining buttons at left and right corners
         leading: IconButton(
-          onPressed: () {},
-          icon: const Icon(Icons.ios_share),
-          tooltip: 'Export .json',
+          onPressed: () {
+            pickFile(wordsData: wordsData, isTable: false);
+          },
+          icon: const Icon(Icons.code),
+          tooltip: 'Import .html',
         ),
+        // leading: IconButton(
+        //   onPressed: () {},
+        //   icon: const Icon(Icons.ios_share),
+        //   tooltip: 'Export .json',
+        // ),
       ),
       body: Consumer<Words>(
         builder: (context, data, child) {
@@ -170,7 +171,7 @@ class MyHomePage extends StatelessWidget {
               ),
               child!, // child is the CardsList widget
               Expanded(
-                flex: 2,
+                flex: 1,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40.0),
                   child: Row(
@@ -178,60 +179,56 @@ class MyHomePage extends StatelessWidget {
                     children: [
                       Text(
                           'Remaining Words: ${data.fbFreshWordsLength}\nRemaining Phrases: ${data.fbFreshPhrasesLength}'),
-                      // Text('Today\'s words: ${todayWords.length}'),
                       Text(
-                          'Today\'s words: ${data.getWordsToReadFromWordsInBox().length}'),
+                          'Today\'s words: ${data.getWordsToReadFromWordsInBox().length}\n WordsInBox: ${data.wordsInBox.length}'),
                     ],
                   ),
                 ),
               ),
-              Expanded(
-                flex: 1,
-                child: Consumer<Words>(
-                  builder: (context, wordsData, _) {
-                    bool allAnswered() {
-                      for (var word in wordsData.wordsInBox) {
-                        if (!(word.answers.contains(word.level) ||
-                            word.answers.contains(-1))) {
-                          // if we are here, so we have not answered a word (at least)
-                          return false;
-                        }
+              Consumer<Words>(
+                builder: (context, wordsData, _) {
+                  bool allAnswered() {
+                    for (var word in wordsData.wordsInBox) {
+                      if (!(word.answers.contains(word.level) ||
+                          word.answers.contains(-1))) {
+                        // if we are here, so we have not answered a word (at least)
+                        return false;
                       }
-                      return true;
                     }
+                    return true;
+                  }
 
-                    return ElevatedButton(
-                      onPressed: allAnswered()
-                          ? () async {
-                              final scaffoldMessenger =
-                                  ScaffoldMessenger.of(context);
-                              final response = await wordsData.makeNewDay();
+                  return ElevatedButton(
+                    onPressed: allAnswered()
+                        ? () async {
+                            final scaffoldMessenger =
+                                ScaffoldMessenger.of(context);
+                            final response = await wordsData.makeNewDay();
+                            scaffoldMessenger.showSnackBar(SnackBar(
+                                content: Text(
+                              response ?? 'Now you can restart the app',
                               // if "response != null" means we've got an error (it returns the error msg)
-                              if (response != null) {
-                                scaffoldMessenger.showSnackBar(SnackBar(
-                                    content: Text(
-                                  response,
-                                  textAlign: TextAlign.center,
-                                )));
-                              }
-                              // if (response == null ||
-                              //     !response.contains('dayNo')) {
-                              //   // if we have no errors OR at least no errors about "dayNo", do this
-                              //   wordsData.dayNoUp();
-                              // }
-                              // wordsData.wordsInBox = await wordsData.fetchBoxWords();
-                            }
-                          : null,
-                      child: const Text('Next Day'),
-                    );
-                  },
-                ),
+                              textAlign: TextAlign.center,
+                            )));
+                          }
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      fixedSize: const Size(320, 60),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(14),
+                        ),
+                      ),
+                    ),
+                    child: const Text('NEXT DAY'),
+                  );
+                },
               ),
             ],
           );
         },
         child: const Expanded(
-          flex: 6,
+          flex: 5,
           child: CardsList(),
         ),
       ),
