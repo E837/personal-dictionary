@@ -211,6 +211,7 @@ class Words with ChangeNotifier {
     int count = 0; // count of chosen words
 
     // handling words of the previous day
+    bool phraseAnsweredWrong = false;
     for (var word in wordsInBox) {
       // fist, we should stage up all the words in box
       await stageUp(word);
@@ -219,65 +220,73 @@ class Words with ChangeNotifier {
         await word.reset();
         // these words are already in the box but we are putting them at the first lvl
         count++;
+        if (word.type == WType.phrase) {
+          phraseAnsweredWrong = true;
+        }
       }
     }
 
     // we are going to add 1 phrase and 7 words to the box
     /// --------- adding fresh phrases to box ---------
     int needCount = 1;
-    final freshPhrasesData = await FirebaseFirestore.instance
-        .collection('freshPhrases')
-        .limit(needCount)
-        .get()
-        .catchError((error) {
-      debugPrint('fetching freshPhrases from firestore failed\nError: $error');
-    });
-    freshPhrases = freshPhrasesData.docs
-        .map((w) => Word.parseMap(w.id, w.data()))
-        .toList();
-
-    if (freshPhrases.isNotEmpty) {
-      // decreasing the freshPhrasesLength
-      // we don't need to wait for this to happen, because we don't need the info right now
-      FirebaseFirestore.instance
-          .collection('metadata')
-          .doc('freshPhrasesLength')
-          .update({'value': FieldValue.increment(-needCount)})
-          // by setting "-needCount" (the "-" is important) we are indeed decreasing the freshPhrasesLength
-          .then((_) => _fbFreshPhrasesLength--)
+    if (!phraseAnsweredWrong) {
+      // if we have answered the phrase of yesterday correctly, so we can add another one...
+      // otherwise, we should learn the previous one first
+      final freshPhrasesData = await FirebaseFirestore.instance
+          .collection('freshPhrases')
+          .limit(needCount)
+          .get()
           .catchError((error) {
-            debugPrint('decreasing freshPhrasesLength failed\nError: $error');
-          });
-    }
+        debugPrint(
+            'fetching freshPhrases from firestore failed\nError: $error');
+      });
+      freshPhrases = freshPhrasesData.docs
+          .map((w) => Word.parseMap(w.id, w.data()))
+          .toList();
 
-    final freshPhrasesCopy = List.of(freshPhrases);
-    for (var word in freshPhrasesCopy) {
-      if (word.level == 0 && word.stage == 0) {
-        word.level = 1;
-        word.stage = 1;
-        await FirebaseFirestore.instance
-            .collection('wordsInBox')
-            .doc(word.id)
-            .set(word.toMap)
-            .then((value) {
-          debugPrint('added phrase "${word.title}" to the box successfully');
-          wordsInBox.add(word);
-        }).catchError((error) {
-          debugPrint('adding phrase "${word.title}" to the box failed');
-        });
-        await FirebaseFirestore.instance
-            .collection('freshPhrases')
-            .doc(word.id)
-            .delete()
-            .then((value) {
-          debugPrint(
-              'deleted phrase "${word.title}" from the freshPhrases list');
-          freshPhrases.remove(word);
-        }).catchError((error) {
-          debugPrint(
-              'deleting phrase "${word.title}" from the freshPhrases failed');
-        });
-        count++;
+      if (freshPhrases.isNotEmpty) {
+        // decreasing the freshPhrasesLength
+        // we don't need to wait for this to happen, because we don't need the info right now
+        FirebaseFirestore.instance
+            .collection('metadata')
+            .doc('freshPhrasesLength')
+            .update({'value': FieldValue.increment(-needCount)})
+            // by setting "-needCount" (the "-" is important) we are indeed decreasing the freshPhrasesLength
+            .then((_) => _fbFreshPhrasesLength--)
+            .catchError((error) {
+              debugPrint('decreasing freshPhrasesLength failed\nError: $error');
+            });
+      }
+
+      final freshPhrasesCopy = List.of(freshPhrases);
+      for (var word in freshPhrasesCopy) {
+        if (word.level == 0 && word.stage == 0) {
+          word.level = 1;
+          word.stage = 1;
+          await FirebaseFirestore.instance
+              .collection('wordsInBox')
+              .doc(word.id)
+              .set(word.toMap)
+              .then((value) {
+            debugPrint('added phrase "${word.title}" to the box successfully');
+            wordsInBox.add(word);
+          }).catchError((error) {
+            debugPrint('adding phrase "${word.title}" to the box failed');
+          });
+          await FirebaseFirestore.instance
+              .collection('freshPhrases')
+              .doc(word.id)
+              .delete()
+              .then((value) {
+            debugPrint(
+                'deleted phrase "${word.title}" from the freshPhrases list');
+            freshPhrases.remove(word);
+          }).catchError((error) {
+            debugPrint(
+                'deleting phrase "${word.title}" from the freshPhrases failed');
+          });
+          count++;
+        }
       }
     }
 
