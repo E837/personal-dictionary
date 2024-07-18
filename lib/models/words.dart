@@ -335,7 +335,13 @@ class Words with ChangeNotifier {
         FirebaseFirestore.instance.collection('wordsInBox').doc(word.id);
     final oldLevel = word.level;
     final oldStage = word.stage;
-    if (word.stage >= word.level) {
+
+    /// lvl 1 => stages count = 2^0 = 1 ==> 0 is indeed (lvl - 1)
+    /// lvl 2 => stages count = 2^1 = 2
+    /// lvl 3 => stages count = 2^2 = 4
+    /// lvl 4 => stages count = 2^3 = 8
+    /// lvl 5 => stages count = 2^4 = 16 (they say it would be 15 but we set 16 days ;))
+    if (word.stage >= pow(2, word.level - 1)) {
       word.level++;
       word.stage = 1;
     } else {
