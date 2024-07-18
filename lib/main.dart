@@ -1,9 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:pdict/models/words.dart';
+import 'package:pdict/auth_screen.dart';
 import 'package:pdict/home_page.dart';
 
 void main() {
@@ -39,7 +41,15 @@ class MyApp extends StatelessWidget {
                 ),
               );
             } else if (snapshot.hasData) {
-              return const MyHomePage();
+              return StreamBuilder(
+                stream: FirebaseAuth.instance.authStateChanges(),
+                builder: (ctx, userSnapshot) {
+                  if (userSnapshot.hasData) {
+                    return const MyHomePage();
+                  }
+                  return AuthScreen();
+                },
+              );
             } else {
               return const Center(
                 child: CircularProgressIndicator(),

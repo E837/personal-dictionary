@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
@@ -93,20 +94,27 @@ class MyHomePage extends StatelessWidget {
             icon: const Icon(Icons.playlist_add),
             tooltip: 'Import .xlsx',
           ),
+          IconButton(
+            onPressed: () {
+              pickFile(wordsData: wordsData, isTable: false);
+            },
+            icon: const Icon(Icons.code),
+            tooltip: 'Import .html',
+          ),
+          // leading: IconButton(
+          //   onPressed: () {},
+          //   icon: const Icon(Icons.ios_share),
+          //   tooltip: 'Export .json',
+          // ),
         ],
         // for now we don't have any export functionality so I placed remaining buttons at left and right corners
         leading: IconButton(
           onPressed: () {
-            pickFile(wordsData: wordsData, isTable: false);
+            FirebaseAuth.instance.signOut();
           },
-          icon: const Icon(Icons.code),
-          tooltip: 'Import .html',
+          icon: const Icon(Icons.logout),
+          tooltip: 'Logout',
         ),
-        // leading: IconButton(
-        //   onPressed: () {},
-        //   icon: const Icon(Icons.ios_share),
-        //   tooltip: 'Export .json',
-        // ),
       ),
       body: Consumer<Words>(
         builder: (context, data, child) {
