@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'word.dart';
 
@@ -32,9 +33,13 @@ class Words with ChangeNotifier {
     final rawMetadata = await FirebaseFirestore.instance
         .collection('metadata')
         .get()
-        .catchError((error) {
+        .catchError((error) async{
       debugPrint('error while getting metadata\nError: $error');
       hasError = true;
+      await Sentry.captureException(
+        error,
+        stackTrace: StackTrace,
+      );
     });
     if (hasError) {
       return;
@@ -65,8 +70,12 @@ class Words with ChangeNotifier {
         .update({'value': FieldValue.increment(1)}).then((_) {
       _fbDayNo++;
       notifyListeners();
-    }).catchError((error) {
+    }).catchError((error) async{
       debugPrint('increasing dayNo on firestore failed\nError $error');
+      await Sentry.captureException(
+        error,
+        stackTrace: StackTrace,
+      );
       throw Exception('dayNo incrementation failed');
     });
   }
@@ -101,11 +110,19 @@ class Words with ChangeNotifier {
             .doc('freshWordsLength')
             .update({'value': FieldValue.increment(1)})
             .then((_) => _fbFreshWordsLength++)
-            .catchError((error) {
+            .catchError((error) async{
               debugPrint('increasing freshWordsLength failed\nError: $error');
+              await Sentry.captureException(
+                error,
+                stackTrace: StackTrace,
+              );
             });
-      }).catchError((error) {
+      }).catchError((error) async{
         debugPrint('word $i failed. error: $error');
+        await Sentry.captureException(
+          error,
+          stackTrace: StackTrace,
+        );
       });
     }
 
@@ -150,11 +167,19 @@ class Words with ChangeNotifier {
             .doc('freshPhrasesLength')
             .update({'value': FieldValue.increment(1)})
             .then((_) => _fbFreshPhrasesLength++)
-            .catchError((error) {
+            .catchError((error) async{
               debugPrint('increasing freshPhrasesLength failed\nError: $error');
+              await Sentry.captureException(
+                error,
+                stackTrace: StackTrace,
+              );
             });
-      }).catchError((error) {
+      }).catchError((error) async{
         debugPrint('phrase $i failed. error: $error');
+        await Sentry.captureException(
+          error,
+          stackTrace: StackTrace,
+        );
       });
     }
 
@@ -178,6 +203,10 @@ class Words with ChangeNotifier {
       await dayNoUp();
     } catch (error) {
       // if dayNo increment fails, we return and don't let the method to continue it's job
+      await Sentry.captureException(
+        error,
+        stackTrace: StackTrace,
+      );
       return (error.toString());
     }
 
@@ -209,9 +238,13 @@ class Words with ChangeNotifier {
           .collection('freshPhrases')
           .limit(needCount)
           .get()
-          .catchError((error) {
+          .catchError((error) async{
         debugPrint(
             'fetching freshPhrases from firestore failed\nError: $error');
+        await Sentry.captureException(
+          error,
+          stackTrace: StackTrace,
+        );
       });
       freshPhrases = freshPhrasesData.docs
           .map((w) => Word.parseMap(w.id, w.data()))
@@ -226,8 +259,12 @@ class Words with ChangeNotifier {
             .update({'value': FieldValue.increment(-needCount)})
             // by setting "-needCount" (the "-" is important) we are indeed decreasing the freshPhrasesLength
             .then((_) => _fbFreshPhrasesLength--)
-            .catchError((error) {
+            .catchError((error) async{
               debugPrint('decreasing freshPhrasesLength failed\nError: $error');
+              await Sentry.captureException(
+                error,
+                stackTrace: StackTrace,
+              );
             });
       }
 
@@ -243,8 +280,12 @@ class Words with ChangeNotifier {
               .then((value) {
             debugPrint('added phrase "${word.title}" to the box successfully');
             wordsInBox.add(word);
-          }).catchError((error) {
+          }).catchError((error) async{
             debugPrint('adding phrase "${word.title}" to the box failed');
+            await Sentry.captureException(
+              error,
+              stackTrace: StackTrace,
+            );
           });
           await FirebaseFirestore.instance
               .collection('freshPhrases')
@@ -254,9 +295,13 @@ class Words with ChangeNotifier {
             debugPrint(
                 'deleted phrase "${word.title}" from the freshPhrases list');
             freshPhrases.remove(word);
-          }).catchError((error) {
+          }).catchError((error) async{
             debugPrint(
                 'deleting phrase "${word.title}" from the freshPhrases failed');
+            await Sentry.captureException(
+              error,
+              stackTrace: StackTrace,
+            );
           });
           count++;
         }
@@ -270,8 +315,12 @@ class Words with ChangeNotifier {
         .limit(needCount)
         // for count to reach wCount (and "max" prevents negative numbers)
         .get()
-        .catchError((error) {
+        .catchError((error) async{
       debugPrint('fetching freshWords from firestore failed\nError: $error');
+      await Sentry.captureException(
+        error,
+        stackTrace: StackTrace,
+      );
     });
     freshWords =
         freshWordsData.docs.map((w) => Word.parseMap(w.id, w.data())).toList();
@@ -285,8 +334,12 @@ class Words with ChangeNotifier {
           .update({'value': FieldValue.increment(-needCount)})
           // by setting "-needCount" (the "-" is important) we are indeed decreasing the freshWordsLength
           .then((_) => _fbFreshWordsLength--)
-          .catchError((error) {
+          .catchError((error) async{
             debugPrint('decreasing freshWordsLength failed\nError: $error');
+            await Sentry.captureException(
+              error,
+              stackTrace: StackTrace,
+            );
           });
     }
 
@@ -302,8 +355,12 @@ class Words with ChangeNotifier {
             .then((value) {
           debugPrint('added word "${word.title}" to the box successfully');
           wordsInBox.add(word);
-        }).catchError((error) {
+        }).catchError((error) async{
           debugPrint('adding word "${word.title}" to the box failed');
+          await Sentry.captureException(
+            error,
+            stackTrace: StackTrace,
+          );
         });
         await FirebaseFirestore.instance
             .collection('freshWords')
@@ -312,9 +369,13 @@ class Words with ChangeNotifier {
             .then((value) {
           debugPrint('deleted word "${word.title}" from the freshWords list');
           freshWords.remove(word);
-        }).catchError((error) {
+        }).catchError((error) async{
           debugPrint(
               'deleting word "${word.title}" from the freshWords failed');
+          await Sentry.captureException(
+            error,
+            stackTrace: StackTrace,
+          );
         });
         count++;
       }
@@ -351,10 +412,14 @@ class Words with ChangeNotifier {
     await doc.update({
       'level': word.level,
       'stage': word.stage,
-    }).catchError((error) {
+    }).catchError((error) async{
       debugPrint('stageUp process failed\nError: $error');
       word.level = oldLevel;
       word.stage = oldStage;
+      await Sentry.captureException(
+        error,
+        stackTrace: StackTrace,
+      );
     });
 
     // finisher condition
@@ -375,19 +440,31 @@ class Words with ChangeNotifier {
           await newDoc.update({
             'level': word.level,
             'stage': word.stage,
-          }).catchError((error) {
+          }).catchError((error) async{
             debugPrint(
                 'updating level/stage of this doneWord failed\nError: $error');
             word.level = oldLevel;
             word.stage = oldStage;
+            await Sentry.captureException(
+              error,
+              stackTrace: StackTrace,
+            );
           });
-        }).catchError((error) {
+        }).catchError((error) async{
           debugPrint('removing item from "wordsInBox" failed\nError: $error');
           wordsInBox.add(word);
+          await Sentry.captureException(
+            error,
+            stackTrace: StackTrace,
+          );
         });
-      }).catchError((error) {
+      }).catchError((error) async{
         debugPrint('adding item to "doneWords" failed\nError: $error');
         doneWords.remove(word);
+        await Sentry.captureException(
+          error,
+          stackTrace: StackTrace,
+        );
       });
     }
   }

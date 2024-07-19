@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 enum WType {
   word,
@@ -62,9 +63,13 @@ class Word with ChangeNotifier {
     await FirebaseFirestore.instance
         .collection('wordsInBox')
         .doc(id)
-        .update({'answers': _answers}).catchError((error) {
+        .update({'answers': _answers}).catchError((error) async{
       debugPrint('submitting answer failed\nError: $error');
       _answers.remove(isCorrect ? level : -1);
+      await Sentry.captureException(
+        error,
+        stackTrace: StackTrace,
+      );
     });
     notifyListeners();
   }
@@ -81,11 +86,15 @@ class Word with ChangeNotifier {
       'level': level,
       'stage': stage,
       'answers': _answers,
-    }).catchError((error) {
+    }).catchError((error) async{
       debugPrint('resetting the word failed\nError: $error');
       level = oldLevel;
       stage = oldStage;
       setAnswers(oldAnswers);
+      await Sentry.captureException(
+        error,
+        stackTrace: StackTrace,
+      );
     });
   }
 

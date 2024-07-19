@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:sentry/sentry.dart';
 
 import 'auth_form.dart';
 
@@ -15,12 +16,12 @@ class _AuthScreenState extends State<AuthScreen> {
   var _isLoading = false;
 
   void _submitAuthForm(
-      String email,
-      String password,
-      String username,
-      bool isLogin,
-      BuildContext ctx,
-      ) async {
+    String email,
+    String password,
+    String username,
+    bool isLogin,
+    BuildContext ctx,
+  ) async {
     UserCredential authResult;
 
     try {
@@ -45,8 +46,13 @@ class _AuthScreenState extends State<AuthScreen> {
           'email': email,
         });
       }
-    } on PlatformException catch (err) {
+    } on FirebaseAuthException catch (err) {
       String? message = 'An error occurred, please check your credentials!';
+
+      await Sentry.captureException(
+        err,
+        stackTrace: StackTrace,
+      );
 
       if (err.message != null) {
         message = err.message;
@@ -61,8 +67,28 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() {
         _isLoading = false;
       });
+    } on PlatformException catch(err) {
+        String? message = 'An error occurred, please try again later!';
+
+        if (err.message != null) {
+          message = err.message;
+        }
+
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text(message!),
+            backgroundColor: Theme.of(ctx).errorColor,
+          ),
+        );
+        setState(() {
+          _isLoading = false;
+        });
     } catch (err) {
-      print(err);
+      debugPrint(err.toString());
+      await Sentry.captureException(
+        err,
+        stackTrace: StackTrace,
+      );
       setState(() {
         _isLoading = false;
       });
