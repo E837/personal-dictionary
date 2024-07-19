@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -7,6 +8,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'word.dart';
 
 class Words with ChangeNotifier {
+  String? userId = FirebaseAuth.instance.currentUser?.uid;
   List<Word> freshWords = [];
   List<Word> freshPhrases = [];
   // we only separate words and phrases when they are fresh, in other situations they don't have any differences
@@ -31,6 +33,8 @@ class Words with ChangeNotifier {
     bool hasError = false;
 
     final rawMetadata = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
         .collection('metadata')
         .get()
         .catchError((error) async{
@@ -65,6 +69,8 @@ class Words with ChangeNotifier {
 
   Future<void> dayNoUp() async {
     await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
         .collection('metadata')
         .doc('dayNo')
         .update({'value': FieldValue.increment(1)}).then((_) {
@@ -94,18 +100,27 @@ class Words with ChangeNotifier {
         translation: translations[i],
       );
 
+      print("------------------------------------------------------");
       await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
           .collection('freshWords')
           .add(wordWithTempId.toMap)
           .then((value) async {
         debugPrint('word $i uploaded successfully -> id: ${value.id}');
+
         final thisWord = Word(
           id: value.id,
           title: sources[i],
           translation: translations[i],
         );
+
         freshWords.add(thisWord);
+        print("++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+
         await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
             .collection('metadata')
             .doc('freshWordsLength')
             .update({'value': FieldValue.increment(1)})
@@ -132,6 +147,8 @@ class Words with ChangeNotifier {
 
     // sending the words length to firestore
     await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
         .collection('metadata')
         .doc('wordsLength')
         .set({'value': max(_fbWordsLength, sources.length)});
@@ -152,6 +169,8 @@ class Words with ChangeNotifier {
       );
 
       await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
           .collection('freshPhrases')
           .add(wordWithTempId.toMap)
           .then((value) async {
@@ -163,6 +182,8 @@ class Words with ChangeNotifier {
         );
         freshPhrases.add(thisWord);
         await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
             .collection('metadata')
             .doc('freshPhrasesLength')
             .update({'value': FieldValue.increment(1)})
@@ -189,6 +210,8 @@ class Words with ChangeNotifier {
 
     // sending the words length to firestore
     await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
         .collection('metadata')
         .doc('phrasesLength')
         .set({'value': max(_fbPhrasesLength, sources.length)});
@@ -235,6 +258,8 @@ class Words with ChangeNotifier {
       // if we have answered the phrase of yesterday correctly, so we can add another one...
       // otherwise, we should learn the previous one first
       final freshPhrasesData = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
           .collection('freshPhrases')
           .limit(needCount)
           .get()
@@ -254,6 +279,8 @@ class Words with ChangeNotifier {
         // decreasing the freshPhrasesLength
         // we don't need to wait for this to happen, because we don't need the info right now
         FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
             .collection('metadata')
             .doc('freshPhrasesLength')
             .update({'value': FieldValue.increment(-needCount)})
@@ -274,6 +301,8 @@ class Words with ChangeNotifier {
           word.level = 1;
           word.stage = 1;
           await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
               .collection('wordsInBox')
               .doc(word.id)
               .set(word.toMap)
@@ -288,6 +317,8 @@ class Words with ChangeNotifier {
             );
           });
           await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
               .collection('freshPhrases')
               .doc(word.id)
               .delete()
@@ -311,6 +342,8 @@ class Words with ChangeNotifier {
     /// --------- adding fresh words to box ---------
     needCount = max(wCount - count, 0);
     final freshWordsData = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
         .collection('freshWords')
         .limit(needCount)
         // for count to reach wCount (and "max" prevents negative numbers)
@@ -329,6 +362,8 @@ class Words with ChangeNotifier {
       // decreasing the freshWordsLength
       // we don't need to wait for this to happen, because we don't need the info right now
       FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
           .collection('metadata')
           .doc('freshWordsLength')
           .update({'value': FieldValue.increment(-needCount)})
@@ -349,6 +384,8 @@ class Words with ChangeNotifier {
         word.level = 1;
         word.stage = 1;
         await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
             .collection('wordsInBox')
             .doc(word.id)
             .set(word.toMap)
@@ -363,6 +400,8 @@ class Words with ChangeNotifier {
           );
         });
         await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
             .collection('freshWords')
             .doc(word.id)
             .delete()
@@ -393,7 +432,11 @@ class Words with ChangeNotifier {
 
   Future<void> stageUp(Word word) async {
     final doc =
-        FirebaseFirestore.instance.collection('wordsInBox').doc(word.id);
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('wordsInBox')
+            .doc(word.id);
     final oldLevel = word.level;
     final oldStage = word.stage;
 
@@ -432,7 +475,11 @@ class Words with ChangeNotifier {
       wordsInBox.remove(word);
 
       final newDoc =
-          FirebaseFirestore.instance.collection('doneWords').doc(word.id);
+          FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('doneWords')
+              .doc(word.id);
 
       await newDoc.set(word.toMap).then((_) {
         // deleting existing doc from "wordsInBox"
@@ -472,7 +519,10 @@ class Words with ChangeNotifier {
   Future<List<Word>> fetchBoxWords() async {
     debugPrint('============== fetching box words');
     final wordsData =
-        await FirebaseFirestore.instance.collection('wordsInBox').get();
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('wordsInBox').get();
     wordsInBox = wordsData.docs.map((w) {
       return Word.parseMap(w.id, w.data());
     }).toList();

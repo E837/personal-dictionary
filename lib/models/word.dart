@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -19,6 +20,7 @@ WType parseToWType(String typeName) {
 }
 
 class Word with ChangeNotifier {
+  String? userId = FirebaseAuth.instance.currentUser?.uid;
   final String id;
   final String title;
   late String url;
@@ -61,6 +63,8 @@ class Word with ChangeNotifier {
       // by adding -1 we are setting a flag to tell that we have answered this one wrong
     }
     await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
         .collection('wordsInBox')
         .doc(id)
         .update({'answers': _answers}).catchError((error) async{
@@ -82,7 +86,11 @@ class Word with ChangeNotifier {
     level = 1;
     stage = 1;
     _answers.clear();
-    await FirebaseFirestore.instance.collection('wordsInBox').doc(id).update({
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('wordsInBox')
+        .doc(id).update({
       'level': level,
       'stage': stage,
       'answers': _answers,
